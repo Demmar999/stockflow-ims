@@ -1,0 +1,63 @@
+/* File: app/(dashboard)/ims-extra.css  (NEW file) - replaces the old ims-additions.css */
+
+.ims .banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.ims .banner.success {
+  background: #e7f8f0;
+  color: #137a4b;
+  border: 1px solid #bfe9d5;
+}
+.ims .banner.error {
+  background: #fdebec;
+  color: #b8343a;
+  border: 1px solid #f6c6c8;
+}
+
+.ims .icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+.ims .icon-btn:hover {
+  color: var(--blue);
+}
+.ims .icon-btn.danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.ims .empty {
+  padding: 28px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.ims .hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: -6px 0 12px;
+}
+.ims .hint b {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.ims .link {
+  color: var(--blue);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ims .link:hover {
+  text-decoration: underline;
+}
