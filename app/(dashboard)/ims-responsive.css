@@ -1,0 +1,258 @@
+/* File: app/(dashboard)/ims-responsive.css  (NEW file)
+   Everything here lives inside @media blocks, so the desktop layout is untouched. */
+
+/* The dimmed overlay behind the mobile menu — invisible on desktop */
+.ims .sidebar-backdrop {
+  display: none;
+}
+
+/* =========================================================
+   TABLET + PHONE  (860px and below)
+   Sidebar becomes a slide-out menu opened by the ☰ button
+   ========================================================= */
+@media (max-width: 860px) {
+  /* ---- slide-out sidebar ---- */
+  .ims .sidebar,
+  .ims .sidebar.collapsed {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 272px;
+    max-width: 82vw;
+    z-index: 300;
+    overflow-y: auto;
+    transform: translateX(-102%);
+    transition:
+      transform 0.24s ease,
+      box-shadow 0.24s ease;
+    padding-top: calc(1.1rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
+  }
+  .ims .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 0 0 48px rgba(5, 10, 25, 0.55);
+  }
+  /* the desktop "icons only" mode doesn't apply to the phone menu */
+  .ims .sidebar.collapsed .brand-text,
+  .ims .sidebar.collapsed .nav-label,
+  .ims .sidebar.collapsed .sidebar-foot {
+    display: revert;
+  }
+  .ims .sidebar.collapsed .nav-item {
+    justify-content: flex-start;
+  }
+  .ims .sidebar.collapsed .brand {
+    justify-content: flex-start;
+  }
+
+  .ims .nav-item {
+    padding: 12px 12px;
+    font-size: 14px;
+  }
+
+  .ims .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    background: rgba(10, 18, 38, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .ims .sidebar.open + .sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ---- top bar ---- */
+  .ims .topbar {
+    gap: 10px;
+    padding: 10px 14px;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  }
+  .ims .search-wrap {
+    max-width: none;
+    margin-left: 0;
+    min-width: 0;
+  }
+  .ims .topbar-right {
+    margin-left: 0;
+    gap: 8px;
+  }
+
+  /* the search results open as a panel that fits the screen */
+  .ims [data-testid="search-results"] {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    top: calc(62px + env(safe-area-inset-top, 0px)) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 68vh !important;
+  }
+
+  /* ---- page ---- */
+  .ims .page-body {
+    padding: 18px 14px calc(36px + env(safe-area-inset-bottom, 0px));
+  }
+  .ims .card {
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  .ims .page-sub {
+    margin-bottom: 16px;
+  }
+
+  /* tables keep their layout and scroll sideways inside their card */
+  .ims .card table {
+    width: max-content;
+    min-width: 100%;
+  }
+  .ims .card td,
+  .ims .card th {
+    white-space: nowrap;
+  }
+
+  /* touch-friendly controls; 16px stops iOS zooming in when a field is tapped */
+  .ims input,
+  .ims select,
+  .ims textarea {
+    font-size: 16px !important;
+  }
+  .ims input:not([type="checkbox"]),
+  .ims select {
+    min-height: 42px;
+  }
+  .ims button {
+    min-height: 38px;
+  }
+  .ims .icon-btn {
+    min-width: 38px;
+    min-height: 38px;
+  }
+  .ims .menu-toggle {
+    width: 42px;
+    height: 42px;
+  }
+
+  /* forms and toolbars wrap instead of overflowing */
+  .ims .card select {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+  .ims .row-between {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .ims .alert-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* reports */
+  .ims .report-stats {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .ims .mini-stat {
+    flex: 1 1 140px;
+  }
+  .ims .report-card.wide .left {
+    flex-wrap: wrap;
+  }
+  .ims .report-card.wide [style*="display: flex"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* pop-ups sit inside the visible screen on phones */
+  .ims [role="dialog"] {
+    max-height: 90vh !important;
+  }
+  @supports (height: 100dvh) {
+    .ims [role="dialog"] {
+      max-height: 90dvh !important;
+    }
+  }
+}
+
+/* =========================================================
+   PHONE  (640px and below)
+   ========================================================= */
+@media (max-width: 640px) {
+  /* the page already shows its own title, so the top bar keeps only what's useful */
+  .ims .page-heading {
+    display: none;
+  }
+  .ims .user-meta {
+    display: none;
+  }
+
+  .ims .page-title {
+    font-size: 18px;
+  }
+
+  .ims .stat {
+    padding: 14px;
+    gap: 8px;
+  }
+  .ims .stat .value {
+    font-size: 22px;
+  }
+  .ims .stat .icon-chip {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .ims .grid-2,
+  .ims .grid-3,
+  .ims .grid-4,
+  .ims .report-grid {
+    gap: 12px;
+  }
+  .ims .mb16 {
+    margin-bottom: 12px;
+  }
+
+  .ims .bar-chart {
+    gap: 6px;
+  }
+
+  /* the Add / Edit product form becomes a single column */
+  .ims #product-form > div {
+    grid-template-columns: 1fr !important;
+  }
+  .ims #product-form > div > div {
+    grid-column: auto !important;
+  }
+}
+
+/* keyboard hints are pointless on a touchscreen */
+@media (hover: none) and (pointer: coarse) {
+  .ims [data-testid="search-results"] > div:last-child {
+    display: none;
+  }
+}
+
+/* =========================================================
+   SMALL PHONES  (400px and below)
+   ========================================================= */
+@media (max-width: 400px) {
+  .ims .page-body {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .ims .topbar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .ims .stat .value {
+    font-size: 20px;
+  }
+  .ims .stat .label {
+    font-size: 11px;
+  }
+}

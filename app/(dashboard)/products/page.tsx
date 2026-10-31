@@ -1,4 +1,3 @@
-// File: app/(dashboard)/products/page.tsx
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
@@ -75,6 +74,7 @@ function ProductsInner() {
     updateProduct,
     deleteProduct,
   } = useInventory();
+
   const params = useSearchParams();
   const router = useRouter();
 
@@ -84,13 +84,19 @@ function ProductsInner() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [newestProductSku, setNewestProductSku] = useState("");
 
-  // Deep links: /products?category=Electronics and /products?add=1
   useEffect(() => {
     const cat = params.get("category");
-    if (cat) setQuery((q) => ({ ...q, category: cat }));
-    const q = params.get("q"); // from the top search bar, Transactions, etc.
-    if (q !== null) setQuery((prev) => ({ ...prev, search: q }));
+    if (cat) {
+      setQuery((q) => ({ ...q, category: cat }));
+    }
+
+    const q = params.get("q");
+    if (q !== null) {
+      setQuery((prev) => ({ ...prev, search: q }));
+    }
+
     if (params.get("add") === "1") {
       setEditingId(null);
       setForm(EMPTY_FORM);
@@ -99,10 +105,23 @@ function ProductsInner() {
     }
   }, [params]);
 
-  if (!isReady) return <p className="page-sub">Loading…</p>;
+  if (!isReady) {
+    return <p className="page-sub">Loading…</p>;
+  }
 
   const categories = uniqueCategories(products);
-  const rows = filterProducts(products, query);
+
+  const newestProduct = products.find((p) => p.sku === newestProductSku);
+
+  const filteredRows = filterProducts(products, query);
+
+  const rows = newestProductSku
+    ? [...filteredRows].sort(
+        (a, b) =>
+          Number(b.sku === newestProductSku) -
+          Number(a.sku === newestProductSku),
+      )
+    : filteredRows;
 
   function openAdd() {
     setEditingId(null);
@@ -110,51 +129,79 @@ function ProductsInner() {
     setError("");
     setModalOpen(true);
   }
+
   function openEdit(p: Product) {
     setEditingId(p.id);
     setForm(toForm(p));
     setError("");
     setModalOpen(true);
   }
+
   function closeModal() {
     setModalOpen(false);
     setError("");
   }
+
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     const input: ProductInput = {
-      name: form.name,
-      sku: form.sku,
-      category: form.category,
+      name: form.name.trim(),
+      sku: form.sku.trim(),
+      category: form.category.trim(),
       icon: form.icon,
       stock: Number(form.stock),
       reorderLevel: Number(form.reorderLevel),
       unitPrice: Number(form.unitPrice),
       supplierId: form.supplierId || null,
     };
+
     const result = editingId
       ? updateProduct(editingId, input)
       : addProduct(input);
+
     if (!result.ok) {
       setError(result.error);
       return;
     }
+
+    if (!editingId) {
+      setNewestProductSku(input.sku);
+
+      setQuery({
+        ...DEFAULT_PRODUCT_QUERY,
+        search: "",
+        category: "all",
+        level: "all",
+      });
+    }
+
     setNotice(
       editingId
-        ? `Updated ${input.name.trim()}.`
-        : `Added ${input.name.trim()}.`,
+        ? `Updated ${input.name}.`
+        : `Added ${input.name}. The new product is shown at the top of the list.`,
     );
+
     closeModal();
   }
 
   function handleDelete(p: Product) {
-    if (!window.confirm(`Delete "${p.name}"? Its transaction history is kept.`))
+    if (
+      !window.confirm(`Delete "${p.name}"? Its transaction history is kept.`)
+    ) {
       return;
+    }
+
     const result = deleteProduct(p.id);
+
+    if (result.ok && p.sku === newestProductSku) {
+      setNewestProductSku("");
+    }
+
     setNotice(result.ok ? `Deleted ${p.name}.` : result.error);
   }
 
@@ -164,16 +211,136 @@ function ProductsInner() {
       <p className="page-sub">Manage your product catalog</p>
 
       {notice && (
-        <div className="banner success">
-          {notice}
+        <div
+          className="banner success"
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            zIndex: 1000,
+            maxWidth: "min(420px, calc(100vw - 40px))",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            boxShadow: "0 8px 28px rgba(0, 0, 0, 0.16)",
+          }}
+        >
+          <span>{notice}</span>
           <button
+            type="button"
             className="icon-btn"
-            style={{ marginLeft: "auto", border: "none", background: "none" }}
+            style={{
+              marginLeft: "auto",
+              border: "none",
+              background: "none",
+              flexShrink: 0,
+            }}
             onClick={() => setNotice("")}
-            aria-label="Dismiss"
+            aria-label="Dismiss notification"
           >
             <IconX size={14} />
           </button>
+        </div>
+      )}
+
+      {newestProduct && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            border: "1px solid var(--accent, #16a34a)",
+          }}
+        >
+          <div className="row-between" style={{ marginBottom: 14 }}>
+            <div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 15,
+                  fontWeight: 700,
+                }}
+              >
+                Recently Added Product
+              </p>
+              <p className="page-sub" style={{ marginBottom: 0 }}>
+                Complete details of your latest product
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setNewestProductSku("")}
+              aria-label="Dismiss recent product details"
+              title="Close details"
+            >
+              <IconX size={14} />
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: 16,
+            }}
+          >
+            <div>
+              <p className="field-label">Product Name</p>
+              <strong>{newestProduct.name}</strong>
+            </div>
+
+            <div>
+              <p className="field-label">SKU</p>
+              <strong>{newestProduct.sku}</strong>
+            </div>
+
+            <div>
+              <p className="field-label">Category</p>
+              <strong>{newestProduct.category}</strong>
+            </div>
+
+            <div>
+              <p className="field-label">Supplier</p>
+              <strong>
+                {findSupplier(suppliers, newestProduct.supplierId)?.name ??
+                  "None"}
+              </strong>
+            </div>
+
+            <div>
+              <p className="field-label">Icon</p>
+              <strong>{newestProduct.icon}</strong>
+            </div>
+
+            <div>
+              <p className="field-label">Stock Quantity</p>
+              <strong>{formatNumber(newestProduct.stock)}</strong>
+            </div>
+
+            <div>
+              <p className="field-label">Reorder Level</p>
+              <strong>{formatNumber(newestProduct.reorderLevel)}</strong>
+            </div>
+
+            <div>
+              <p className="field-label">Unit Price</p>
+              <strong>{formatPeso(newestProduct.unitPrice)}</strong>
+            </div>
+
+            <div>
+              <p className="field-label">Stock Status</p>
+              <span
+                className={`dot-status ${
+                  CATALOG_TONE[getStockLevel(newestProduct)]
+                }`}
+              >
+                {CATALOG_LABEL[getStockLevel(newestProduct)]}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -189,6 +356,7 @@ function ProductsInner() {
           >
             All products ({rows.length})
           </p>
+
           <button className="primary" onClick={openAdd}>
             <IconPlus size={15} /> Add product
           </button>
@@ -209,6 +377,7 @@ function ProductsInner() {
             value={query.search}
             onChange={(e) => setQuery({ ...query, search: e.target.value })}
           />
+
           <select
             value={query.category}
             onChange={(e) => setQuery({ ...query, category: e.target.value })}
@@ -220,10 +389,14 @@ function ProductsInner() {
               </option>
             ))}
           </select>
+
           <select
             value={query.level}
             onChange={(e) =>
-              setQuery({ ...query, level: e.target.value as LevelFilter })
+              setQuery({
+                ...query,
+                level: e.target.value as LevelFilter,
+              })
             }
           >
             <option value="all">All statuses</option>
@@ -232,10 +405,14 @@ function ProductsInner() {
             <option value="below">{CATALOG_LABEL.below}</option>
             <option value="out">{CATALOG_LABEL.out}</option>
           </select>
+
           <select
             value={query.sort}
             onChange={(e) =>
-              setQuery({ ...query, sort: e.target.value as ProductSort })
+              setQuery({
+                ...query,
+                sort: e.target.value as ProductSort,
+              })
             }
           >
             <option value="name">Sort: Name</option>
@@ -260,10 +437,12 @@ function ProductsInner() {
                 <th className="right">Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {rows.map((p) => {
                 const level = getStockLevel(p);
                 const Icon = PRODUCT_ICON_MAP[p.icon];
+
                 return (
                   <tr key={p.id}>
                     <td>
@@ -277,19 +456,30 @@ function ProductsInner() {
                         </div>
                       </div>
                     </td>
+
                     <td>{p.category}</td>
+
                     <td>
                       {findSupplier(suppliers, p.supplierId)?.name ?? "—"}
                     </td>
+
                     <td className="right num">{formatPeso(p.unitPrice)}</td>
+
                     <td className="right num">{formatNumber(p.stock)}</td>
+
                     <td className="right">
                       <span className={`dot-status ${CATALOG_TONE[level]}`}>
                         {CATALOG_LABEL[level]}
                       </span>
                     </td>
+
                     <td className="right">
-                      <div style={{ display: "inline-flex", gap: 6 }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          gap: 6,
+                        }}
+                      >
                         <button
                           className="icon-btn"
                           title="Stock in"
@@ -300,6 +490,7 @@ function ProductsInner() {
                         >
                           <IconArrowDown size={14} />
                         </button>
+
                         <button
                           className="icon-btn"
                           title="Stock out"
@@ -310,6 +501,7 @@ function ProductsInner() {
                         >
                           <IconArrowUp size={14} />
                         </button>
+
                         <button
                           className="icon-btn"
                           onClick={() => openEdit(p)}
@@ -317,6 +509,7 @@ function ProductsInner() {
                         >
                           <IconEdit size={14} />
                         </button>
+
                         <button
                           className="icon-btn danger"
                           onClick={() => handleDelete(p)}
@@ -343,6 +536,7 @@ function ProductsInner() {
               <button type="button" className="btn-ghost" onClick={closeModal}>
                 Cancel
               </button>
+
               <button type="submit" form="product-form" className="primary">
                 {editingId ? "Save changes" : "Add product"}
               </button>
@@ -369,6 +563,7 @@ function ProductsInner() {
                   required
                 />
               </div>
+
               <div>
                 <p className="field-label">SKU</p>
                 <input
@@ -379,6 +574,7 @@ function ProductsInner() {
                   required
                 />
               </div>
+
               <div>
                 <p className="field-label">Category</p>
                 <input
@@ -395,6 +591,7 @@ function ProductsInner() {
                   ))}
                 </datalist>
               </div>
+
               <div>
                 <p className="field-label">Supplier</p>
                 <select
@@ -410,6 +607,7 @@ function ProductsInner() {
                   ))}
                 </select>
               </div>
+
               <div>
                 <p className="field-label">Icon</p>
                 <select
@@ -426,6 +624,7 @@ function ProductsInner() {
                   ))}
                 </select>
               </div>
+
               <div>
                 <p className="field-label">Stock</p>
                 <input
@@ -436,6 +635,7 @@ function ProductsInner() {
                   onChange={(e) => setField("stock", e.target.value)}
                 />
               </div>
+
               <div>
                 <p className="field-label">Reorder level</p>
                 <input
@@ -446,6 +646,7 @@ function ProductsInner() {
                   onChange={(e) => setField("reorderLevel", e.target.value)}
                 />
               </div>
+
               <div style={{ gridColumn: "span 2" }}>
                 <p className="field-label">Unit price (₱)</p>
                 <input

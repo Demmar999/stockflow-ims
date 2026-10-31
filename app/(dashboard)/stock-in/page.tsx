@@ -1,13 +1,12 @@
-// File: app/(dashboard)/stock-in/page.tsx
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CURRENT_USER, useInventory } from "@/lib/store";
+import { useInventory } from "@/lib/store";
 import { findProduct, getStockLevel, isAlertLevel } from "@/lib/selectors";
 import { formatNumber } from "@/lib/format";
-import { IconArrowDown } from "@/components/ims-icons";
+import { IconArrowDown, IconX } from "@/components/ims-icons";
 
 type Feedback = {
   tone: "success" | "warn";
@@ -15,34 +14,89 @@ type Feedback = {
   links: { href: string; label: string }[];
 };
 
-function FeedbackBanner({ f }: { f: Feedback }) {
-  const palette =
-    f.tone === "warn"
-      ? {
-          background: "var(--warning-light)",
-          color: "#8a5e10",
-          border: "1px solid #f3e1b5",
-        }
-      : {
-          background: "#e7f8f0",
-          color: "#137a4b",
-          border: "1px solid #bfe9d5",
-        };
+type CurrentUser = {
+  name: string;
+  role: string;
+};
+
+function FeedbackBanner({ f, onClose }: { f: Feedback; onClose: () => void }) {
+  const isWarning = f.tone === "warn";
+
   return (
-    <div className="banner" style={{ ...palette, flexWrap: "wrap" }}>
-      <span data-testid="feedback">{f.text}</span>
-      <span style={{ marginLeft: "auto", display: "inline-flex", gap: 12 }}>
-        {f.links.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className="link"
-            style={{ fontWeight: 600 }}
-          >
-            {l.label}
-          </Link>
-        ))}
-      </span>
+    <div
+      className="banner"
+      role={isWarning ? "alert" : "status"}
+      aria-live={isWarning ? "assertive" : "polite"}
+      data-testid="feedback"
+      style={{
+        position: "fixed",
+        top: 24,
+        right: 24,
+        zIndex: 1000,
+        width: "min(630px, calc(100vw - 32px))",
+        boxSizing: "border-box",
+        background: isWarning ? "var(--warning-light)" : "#e7f8f0",
+        color: isWarning ? "#8a5e10" : "#137a4b",
+        border: isWarning ? "1px solid #f3e1b5" : "1px solid #bfe9d5",
+        borderRadius: 14,
+        padding: "16px 42px 16px 18px",
+        boxShadow: "0 12px 35px rgba(15, 23, 42, 0.14)",
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <span style={{ flex: "1 1 220px", lineHeight: 1.6 }}>{f.text}</span>
+
+      {f.links.length > 0 && (
+        <span
+          style={{
+            display: "inline-flex",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          {f.links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="link"
+              style={{
+                color: "inherit",
+                fontWeight: 600,
+                textDecoration: "underline",
+              }}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </span>
+      )}
+
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Dismiss notification"
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 28,
+          height: 28,
+          padding: 0,
+          border: "none",
+          background: "transparent",
+          color: "inherit",
+          cursor: "pointer",
+          opacity: 0.75,
+        }}
+      >
+        <IconX size={16} />
+      </button>
     </div>
   );
 }
@@ -57,57 +111,136 @@ function StockInInner() {
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [userLoaded, setUserLoaded] = useState(false);
 
-  // /stock-in?productId=...  (from Alerts, Monitoring, Dashboard, Products)
+  useEffect(() => {
+    let active = true;
+
+    async function loadCurrentUser() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to retrieve the logged-in user.");
+        }
+
+        const data = await response.json();
+
+        if (active) {
+          setCurrentUser(data.user ?? null);
+        }
+      } catch (error) {
+        console.error("Failed to load current user:", error);
+
+        if (active) {
+          setCurrentUser(null);
+        }
+      } finally {
+        if (active) {
+          setUserLoaded(true);
+        }
+      }
+    }
+
+    loadCurrentUser();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     const id = params.get("productId");
-    if (id) setProductId(id);
+
+    if (id) {
+      setProductId(id);
+    }
   }, [params]);
 
-  // Default the supplier to the product's own supplier when it has one
   useEffect(() => {
     if (!productId) return;
+
     const product = findProduct(products, productId);
     const linked = suppliers.find((s) => s.id === product?.supplierId);
-    if (linked) setSupplierName(linked.name);
+
+    if (linked) {
+      setSupplierName(linked.name);
+    }
   }, [productId, products, suppliers]);
 
-  if (!isReady) return <p className="page-sub">Loading…</p>;
+  if (!isReady) {
+    return <p className="page-sub">Loading…</p>;
+  }
 
   const selected = findProduct(products, productId);
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFeedback(null);
+    setError("");
+
+    if (!userLoaded) {
+      setError("Please wait while your account is being verified.");
+      return;
+    }
+
+    if (!currentUser?.name?.trim()) {
+      setError("Unable to identify the logged-in admin. Please log in again.");
+      return;
+    }
+
     const before = selected;
     const qty = Number(quantity);
+
+    if (!Number.isInteger(qty) || qty < 1) {
+      setError("Quantity must be a whole number greater than zero.");
+      return;
+    }
+
+    if (!before) {
+      setError("Please select a valid product.");
+      return;
+    }
+
+    if (!suppliers.some((s) => s.name === supplierName)) {
+      setError("Please select a valid supplier.");
+      return;
+    }
 
     const result = recordStockIn({
       productId,
       quantity: qty,
       reference,
       counterparty: supplierName,
-      user: CURRENT_USER,
+      user: currentUser.name.trim(),
     });
+
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    setError("");
 
-    // Tell the user what this movement did to the rest of the system
-    const added = Math.trunc(qty);
-    const newStock = (before?.stock ?? 0) + added;
-    const wasAlert = before ? isAlertLevel(getStockLevel(before)) : false;
-    const nowAlert = before
-      ? isAlertLevel(
-          getStockLevel({ stock: newStock, reorderLevel: before.reorderLevel }),
-        )
-      : false;
+    const added = qty;
+    const newStock = before.stock + added;
+    const wasAlert = isAlertLevel(getStockLevel(before));
 
-    let text = `Added ${formatNumber(added)} × ${before?.name ?? "item"}. Stock is now ${formatNumber(newStock)}.`;
-    if (wasAlert && !nowAlert) text += " It's no longer on the low-stock list.";
-    else if (nowAlert) text += " Still at or below its reorder level.";
+    const nowAlert = isAlertLevel(
+      getStockLevel({
+        stock: newStock,
+        reorderLevel: before.reorderLevel,
+      }),
+    );
+
+    let text = `Stock in successful! Added ${formatNumber(added)} units of ${before.name}. Stock is now ${formatNumber(newStock)}.`;
+
+    if (wasAlert && !nowAlert) {
+      text += " This product is no longer on the low-stock list.";
+    } else if (nowAlert) {
+      text += " This product is still at or below its reorder level.";
+    }
 
     setFeedback({
       tone: "success",
@@ -117,26 +250,41 @@ function StockInInner() {
         { href: "/monitoring", label: "Monitoring" },
       ],
     });
+
     setQuantity("");
     setReference("");
   }
 
   return (
     <>
+      {feedback && (
+        <FeedbackBanner f={feedback} onClose={() => setFeedback(null)} />
+      )}
+
       <p className="page-title">Stock in</p>
       <p className="page-sub">Record incoming stock from a supplier</p>
 
       <form className="card" style={{ maxWidth: 460 }} onSubmit={handleSubmit}>
-        {error && <div className="banner error">{error}</div>}
-        {feedback && <FeedbackBanner f={feedback} />}
+        {error && (
+          <div
+            className="banner error"
+            role="alert"
+            aria-live="assertive"
+            style={{ marginBottom: 16 }}
+          >
+            {error}
+          </div>
+        )}
 
         <p className="field-label">Product</p>
         <select
+          required
           style={{ width: "100%", marginBottom: 12 }}
           value={productId}
           onChange={(e) => {
             setProductId(e.target.value);
             setFeedback(null);
+            setError("");
           }}
         >
           <option value="">Select a product…</option>
@@ -149,9 +297,14 @@ function StockInInner() {
 
         <p className="field-label">Supplier</p>
         <select
+          required
           style={{ width: "100%", marginBottom: 12 }}
           value={supplierName}
-          onChange={(e) => setSupplierName(e.target.value)}
+          onChange={(e) => {
+            setSupplierName(e.target.value);
+            setFeedback(null);
+            setError("");
+          }}
         >
           <option value="">Select a supplier…</option>
           {suppliers.map((s) => (
@@ -165,12 +318,13 @@ function StockInInner() {
         <input
           type="number"
           min="1"
+          step="1"
+          required
           placeholder="0"
-          style={{ width: "100%", marginBottom: 0 }}
+          style={{ width: "100%", marginBottom: 12 }}
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
         />
-        <div style={{ marginBottom: 12 }} />
 
         <p className="field-label">Reference no.</p>
         <input
@@ -185,6 +339,7 @@ function StockInInner() {
           type="submit"
           className="primary"
           style={{ width: "100%", height: 40 }}
+          disabled={!userLoaded}
         >
           <IconArrowDown size={16} /> Confirm stock in
         </button>
